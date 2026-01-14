@@ -126,6 +126,7 @@ local Input = MainTab:CreateInput({
 local FarmSection = FarmTab:CreateSection("Farm")
 
 _G.AutoCollectCoinsLoop = false
+_G.AutoCollectDelay = 2
 
 local Toggle = FarmTab:CreateToggle({
    Name = "Auto Collect Coins",
@@ -137,9 +138,28 @@ local Toggle = FarmTab:CreateToggle({
             spawn(function()
                 while _G.AutoCollectCoinsLoop do
                     game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("PlaceBestBaddies"):InvokeServer()
-                    wait(2) -- Delay between setiap eksekusi (ubah angka sesuai kebutuhan)
+                    wait(_G.AutoCollectDelay)
                 end
             end)
+        end
+   end,
+})
+
+local DelayInput = FarmTab:CreateInput({
+   Name = "Auto Collect Coins Delay (Seconds)",
+   PlaceholderText = "text here",
+   RemoveTextAfterFocusLost = true,
+   Callback = function(Text)
+        local delayValue = tonumber(Text)
+        if delayValue and delayValue > 0 then
+            _G.AutoCollectDelay = delayValue
+        else
+            Rayfield:Notify({
+                Title = "Input Error",
+                Content = "Masukkan angka positif untuk delay!",
+                Duration = 3,
+                Image = 4483362458
+            })
         end
    end,
 })
