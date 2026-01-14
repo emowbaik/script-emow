@@ -45,7 +45,7 @@ Rayfield:Notify({
 })
 
 local MainTab = Window:CreateTab("Main", nil) -- Title, Image
--- local MainTab = Window:CreateTab("Main", nil) -- Title, Image
+local FarmTab = Window:CreateTab("Farm", nil) -- Title, Image
 -- local MainSection = MainTab:CreateSection("Main")
 -- local OtherSection = MainTab:CreateSection("Other")
 
@@ -123,9 +123,9 @@ local Input = MainTab:CreateInput({
    end,
 })
 
-local OtherSection = MainTab:CreateSection("Farm")
+local FarmSection = FarmTab:CreateSection("Farm")
 
-local Toggle = MainTab:CreateToggle({
+local Toggle = FarmTab:CreateToggle({
    Name = "Auto Collect Coins",
    CurrentValue = false,
    Flag = "Toggle1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
