@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-   Name = "Spin a Baddie 1.3",
+   Name = "Spin a Baddie",
    Icon = 0, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
    LoadingTitle = "Spin a Baddie",
    LoadingSubtitle = "by emow",
@@ -37,6 +37,41 @@ local Window = Rayfield:CreateWindow({
    }
 })
 
+-- Data
+local diceOptions = {
+    "Basic Dice",
+    "Silver Dice",
+    "Golden Dice",
+    "Aureline Dice",
+    "Crystallum Dice",
+    "Diamond Dice",
+    "Nebulite Dice",
+    "Galaxion Dice",
+    "Quantum Dice",
+    "Devil Dice",
+    "Heaven Dice",
+    "Nebula Dice",
+    "Singularity Dice",
+    "Aqua Dice",
+    "Lucky Dice",
+    "Void Dice",
+    "Ethereal Dice",
+    "Celestial Dice",
+    "Solar Dice",
+    "Abyssal Dice",
+    "Hell Dice",
+    "Infinity Dice",
+    "Blackhole Dice",
+    "Death Dice",
+    "Paradoxical Dice",
+    "Soul Dice",
+    "Joker Dice",
+    "Reality Dice",
+    "Kraken Dice",
+    "Seraphic Dice",
+    "Galactic Dice"
+}
+
 Rayfield:Notify({
    Title = "Execute",
    Content = "Successfully✅",
@@ -46,6 +81,7 @@ Rayfield:Notify({
 
 local MainTab = Window:CreateTab("Main", nil) -- Title, Image
 local FarmTab = Window:CreateTab("Farm", nil) -- Title, Image
+local ShopTab = Window:CreateTab("Shop", nil) -- Title, Image
 -- local MainSection = MainTab:CreateSection("Main")
 -- local OtherSection = MainTab:CreateSection("Other")
 
@@ -103,17 +139,6 @@ local Slider = MainTab:CreateSlider({
    end,
 })
 
-local Dropdown = MainTab:CreateDropdown({
-   Name = "Select Area",
-   Options = {"Starter World","Pirate Island","Pineapple Paradise"},
-   CurrentOption = {"Starter World"},
-   MultipleOptions = false,
-   Flag = "dropdownarea", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
-   Callback = function(Option)
-        print(Option)
-   end,
-})
-
 local Input = MainTab:CreateInput({
    Name = "Walkspeed",
    PlaceholderText = "1-500",
@@ -167,7 +192,7 @@ local DelayInput = FarmTab:CreateInput({
 local FarmSection = FarmTab:CreateSection("Dice Farm")
 
 _G.AutoRollDiceLoop = false
-_G.AutoRollDiceDelay = 2
+_G.AutoRollDiceDelay = 0
 
 local Toggle = FarmTab:CreateToggle({
    Name = "Auto Roll Dice",
@@ -193,7 +218,7 @@ local DelayInput = FarmTab:CreateInput({
    Callback = function(Text)
         local delayValue = tonumber(Text)
         if delayValue and delayValue > 0 then
-            _G.AutoRollDiceDelay = delayValue
+            _G.AutoCollectDelay = delayValue
         else
             Rayfield:Notify({
                 Title = "Input Error",
@@ -202,72 +227,5 @@ local DelayInput = FarmTab:CreateInput({
                 Image = 4483362458
             })
         end
-   end,
-})
-
-_G.AvailableDice = {}
-
-local function GetPlayerDice()
-    local diceList = {}
-    local player = game:GetService("Players").LocalPlayer
-    
-    -- Coba ambil dari ReplicatedStorage
-    local replicatedStorage = game:GetService("ReplicatedStorage")
-    
-    -- Coba berbagai path untuk mencari data dice
-    local possiblePaths = {
-        replicatedStorage:FindFirstChild("PlayerData"),
-        replicatedStorage:FindFirstChild("Dice"),
-        replicatedStorage:FindFirstChild("updateRollingDice"),
-        player:FindFirstChild("PlayerData"),
-        player:FindFirstChild("Dice"),
-        player:FindFirstChild("updateRollingDice")
-
-    }
-    
-    for _, path in ipairs(possiblePaths) do
-        if path then
-            for _, item in ipairs(path:GetChildren()) do
-                table.insert(diceList, item.Name)
-            end
-            if #diceList > 0 then
-                break
-            end
-        end
-    end
-    
-    -- Jika tidak ada data, gunakan default
-    if #diceList == 0 then
-        diceList = {"none"}
-    end
-    
-    _G.AvailableDice = diceList
-    return diceList
-end
-
-local diceOptions = GetPlayerDice()
-
-local Dropdown = FarmTab:CreateDropdown({
-   Name = "Select Dice",
-   Options = diceOptions,
-   CurrentOption = {diceOptions[1] or "none"},
-   MultipleOptions = false,
-   Flag = "dropdownarea1",
-   Callback = function(Option)
-        getgenv().SelectedDice = Option
-   end,
-})
-
-local RefreshButton = FarmTab:CreateButton({
-   Name = "Refresh Dice List",
-   Callback = function()
-        local updatedDice = GetPlayerDice()
-        Dropdown:Refresh(updatedDice, true)
-        Rayfield:Notify({
-            Title = "Success",
-            Content = "Dice list updated! Found " .. #updatedDice .. " dice.",
-            Duration = 3,
-            Image = 4483362458
-        })
    end,
 })
