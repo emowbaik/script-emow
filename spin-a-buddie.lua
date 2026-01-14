@@ -238,7 +238,7 @@ local DelayInput = FarmTab:CreateInput({
    Callback = function(Text)
         local delayValue = tonumber(Text)
         if delayValue and delayValue > 0 then
-            _G.AutoCollectDelay = delayValue
+            _G.AutoRollDiceDelay = delayValue
         else
             Rayfield:Notify({
                 Title = "Input Error",
