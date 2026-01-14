@@ -82,6 +82,17 @@ local potionOptions = {
     "Money Potion 3"
 }
 
+local petOptions = {
+    "CatEgg",
+    "DogEgg",
+    "CubeEgg",
+    "SlimeEgg",
+    "NullEgg",
+    "AquaEgg",
+    "MartianEgg",
+    "BackroomsEgg"
+}
+
 Rayfield:Notify({
    Title = "Execute",
    Content = "Successfully✅",
@@ -374,3 +385,69 @@ local Toggle = ShopTab:CreateToggle({
    end,
 })
 
+local ShopSection = ShopTab:CreateSection("Pet Shop")
+
+local selectPetOptions = {}
+
+local Dropdown = ShopTab:CreateDropdown({
+   Name = "Select Pet",
+   Options = petOptions,
+   CurrentOption = {"CatEgg"},
+   MultipleOptions = true,
+   Flag = "dropdown2", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Option)
+        selectPetOptions = Option
+   end,
+})
+
+_G.AutoBuyPetLoop = false
+_G.AutoBuyPetDelay = 1.1 -- Saya set sedikit di atas 1 detik karena InvokeServer butuh waktu respon
+
+local Toggle = ShopTab:CreateToggle({
+   Name = "Auto Buy Selected Pets",
+   CurrentValue = false,
+   Flag = "ToggleAutoBuyPets",
+   Callback = function(Value)
+       _G.AutoBuyPetLoop = Value
+       if Value then
+           task.spawn(function()
+               while _G.AutoBuyPetLoop do
+                   -- Cek apakah user sudah memilih dadu di dropdown
+                   if #selectPetOptions > 0 then
+                       for _, petName in pairs(selectPetOptions) do
+                           if not _G.AutoBuyPetLoop then break end 
+                           
+                           pcall(function()
+                               -- MENYUSUN ARGUMEN (Payload)
+                               local args = {
+                                   [1] = petName,  -- Arg 1: Nama dice (Dinamis dari loop)
+                                   [2] = 1,         -- Arg 2: Jumlah (Statik, sesuai spy)
+                                   [3] = "potion"     -- Arg 3: Tipe (Statik, sesuai spy)
+                               }
+                               
+                               -- EKSEKUSI REMOTE
+                               -- Menggunakan InvokeServer sesuai data RemoteSpy Anda
+                               game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RegularPet"):InvokeServer(unpack(args))
+                               
+                               print("Membeli: " .. petName)
+                           end)
+                           
+                           task.wait(0.1) -- Jeda mikro agar tidak crash jika beli banyak tipe sekaligus
+                       end
+                   else
+                       -- Feedback visual jika lupa pilih item
+                       Rayfield:Notify({
+                           Title = "System",
+                           Content = "Pilih egg dulu di menu dropdown!",
+                           Duration = 3,
+                           Image = 4483362458
+                       })
+                       _G.AutoBuyPetLoop = false 
+                   end
+                   
+                   task.wait(_G.AutoBuyPetDelay)
+               end
+           end)
+       end
+   end,
+})
