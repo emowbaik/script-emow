@@ -72,6 +72,16 @@ local diceOptions = {
     "Galactic Dice"
 }
 
+local potionOptions = {
+    "Luck Potion 1",
+    "Money Potion 1",
+    "Luck Potion 2",
+    "Money Potion 2",
+    "Mutation Chance Potion 1",
+    "Luck Potion 3",
+    "Money Potion 3"
+}
+
 Rayfield:Notify({
    Title = "Execute",
    Content = "Successfully✅",
@@ -229,3 +239,71 @@ local DelayInput = FarmTab:CreateInput({
         end
    end,
 })
+
+local ShopSection = ShopTab:CreateSection("Dice Shop")
+
+local selectDiceOptions = {}
+
+local Dropdown = ShopTab:CreateDropdown({
+   Name = "Select Dice",
+   Options = diceOptions,
+   CurrentOption = {"Basic Dice"},
+   MultipleOptions = true,
+   Flag = "dropdown1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Option)
+        selectDiceOptions = Option
+   end,
+})
+
+_G.AutoBuyDiceLoop = false
+_G.AutoBuyDiceDelay = 1.1 -- Saya set sedikit di atas 1 detik karena InvokeServer butuh waktu respon
+
+local Toggle = ShopTab:CreateToggle({
+   Name = "Auto Buy Selected Dice",
+   CurrentValue = false,
+   Flag = "ToggleAutoBuyDice", 
+   Callback = function(Value)
+       _G.AutoBuyDiceLoop = Value
+       if Value then
+           task.spawn(function()
+               while _G.AutoBuyDiceLoop do
+                   -- Cek apakah user sudah memilih dadu di dropdown
+                   if #selectDiceOptions > 0 then
+                       for _, diceName in pairs(selectDiceOptions) do
+                           if not _G.AutoBuyDiceLoop then break end 
+                           
+                           pcall(function()
+                               -- MENYUSUN ARGUMEN (Payload)
+                               local args = {
+                                   [1] = diceName,  -- Arg 1: Nama dice (Dinamis dari loop)
+                                   [2] = 1,         -- Arg 2: Jumlah (Statik, sesuai spy)
+                                   [3] = "dice"     -- Arg 3: Tipe (Statik, sesuai spy)
+                               }
+                               
+                               -- EKSEKUSI REMOTE
+                               -- Menggunakan InvokeServer sesuai data RemoteSpy Anda
+                               game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buy"):InvokeServer(unpack(args))
+                               
+                               print("Membeli: " .. diceName)
+                           end)
+                           
+                           task.wait(0.1) -- Jeda mikro agar tidak crash jika beli banyak tipe sekaligus
+                       end
+                   else
+                       -- Feedback visual jika lupa pilih item
+                       Rayfield:Notify({
+                           Title = "System",
+                           Content = "Pilih dadu dulu di menu dropdown!",
+                           Duration = 3,
+                           Image = 4483362458
+                       })
+                       _G.AutoBuyDiceLoop = false 
+                   end
+                   
+                   task.wait(_G.AutoBuyDiceDelay)
+               end
+           end)
+       end
+   end,
+})
+
