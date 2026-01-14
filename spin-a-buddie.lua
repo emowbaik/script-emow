@@ -295,7 +295,6 @@ local Toggle = ShopTab:CreateToggle({
                                -- Menggunakan InvokeServer sesuai data RemoteSpy Anda
                                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buy"):InvokeServer(unpack(args))
                                
-                               print("Membeli: " .. diceName)
                            end)
                            
                            task.wait(0.1) -- Jeda mikro agar tidak crash jika beli banyak tipe sekaligus
@@ -362,7 +361,6 @@ local Toggle = ShopTab:CreateToggle({
                                -- Menggunakan InvokeServer sesuai data RemoteSpy Anda
                                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buy"):InvokeServer(unpack(args))
                                
-                               print("Membeli: " .. potionName)
                            end)
                            
                            task.wait(0.1) -- Jeda mikro agar tidak crash jika beli banyak tipe sekaligus
@@ -429,7 +427,6 @@ local Toggle = ShopTab:CreateToggle({
                                -- Menggunakan InvokeServer sesuai data RemoteSpy Anda
                                game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RegularPet"):InvokeServer(unpack(args))
                                
-                               print("Membeli: " .. petName)
                            end)
                            
                            task.wait(0.1) -- Jeda mikro agar tidak crash jika beli banyak tipe sekaligus
