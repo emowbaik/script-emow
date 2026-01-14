@@ -94,8 +94,8 @@ local petOptions = {
 }
 
 Rayfield:Notify({
-   Title = "Execute",
-   Content = "Successfully✅",
+   Title = "Script Loaded",
+   Content = "Welcome to Spin a Baddie script by Emow!",
    Duration = 5,
    Image = 13047715178
 })
@@ -250,144 +250,181 @@ local DelayInput = FarmTab:CreateInput({
    end,
 })
 
-local ShopSection = ShopTab:CreateSection("Dice Shop (RESTOCK TARGET)")
+local ShopSection = ShopTab:CreateSection("Dice Shop")
 
 -- [DATA & STATE]
 local ShopState = {
     SelectedDice = {},
     MasterList = diceOptions, 
-    IsAutoBuying = false,
-    Delay = 0.6, 
+    IsSniperActive = false, -- Toggle Utama
     MaxQuantity = 999, 
     Remote = nil,
-    ShopContainer = nil 
+    ShopContainer = nil,
+    TimerLabel = nil, -- Akan diisi otomatis
+    
+    -- State Internal untuk mencegah spam saat timer 0
+    HasBoughtThisCycle = false 
 }
 
--- [INIT PATH: TARGET RESTOCK]
--- Sesuai temuan Anda: PlayerGui.Main.Restock.ScrollingFrame
-local function InitShopPath()
+-- [1. INIT PATHS]
+local function InitPaths()
     local plr = game:GetService("Players").LocalPlayer
     local pGui = plr:WaitForChild("PlayerGui")
     
-    local success, result = pcall(function()
-        return pGui:WaitForChild("Main"):WaitForChild("Restock"):WaitForChild("ScrollingFrame")
-    end)
-    
-    if success and result then
-        ShopState.ShopContainer = result
-        print("✅ [SYSTEM] Target Shop Ditemukan: " .. result:GetFullName())
-    else
-        warn("⚠️ [SYSTEM] Gagal menemukan 'Restock.ScrollingFrame'. Buka menu Shop dulu!")
-    end
-end
-task.spawn(InitShopPath)
-
--- [INIT REMOTE]
-local function InitRemote()
+    -- Init Remote
     if not ShopState.Remote then
-        local success, result = pcall(function()
+        local s, r = pcall(function()
             return game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buy")
         end)
-        if success then ShopState.Remote = result end
+        if s then ShopState.Remote = r end
+    end
+
+    -- Init Shop Container (Untuk baca stock - Opsional tapi bagus)
+    if not ShopState.ShopContainer then
+        local s, r = pcall(function()
+            return pGui:WaitForChild("Main"):WaitForChild("Restock"):WaitForChild("ScrollingFrame")
+        end)
+        if s then ShopState.ShopContainer = r end
+    end
+
+    -- Init Timer Label (CRUCIAL)
+    if not ShopState.TimerLabel then
+        local s, r = pcall(function()
+            return pGui:WaitForChild("Main"):WaitForChild("Restock"):WaitForChild("Header"):WaitForChild("restock_dur")
+        end)
+        if s then 
+            ShopState.TimerLabel = r 
+            print("✅ Timer Shop Dice Found: " .. r:GetFullName())
+        else
+            warn("⚠️ Gagal menemukan Timer")
+        end
     end
 end
-InitRemote()
+task.spawn(InitPaths)
 
--- [THE EYES: SCANNER STOCK CERDAS]
-local function GetCurrentStock(diceName)
-    if not ShopState.ShopContainer then InitShopPath() end
-    if not ShopState.ShopContainer then return 9999 end
-
-    -- Cari folder item (Misal: "Silver Dice")
-    local itemFrame = ShopState.ShopContainer:FindFirstChild(diceName)
+-- [2. HELPER: PARSE TIMER]
+-- Mengubah "01:30" menjadi detik (90)
+local function GetSecondsLeft()
+    if not ShopState.TimerLabel then return 9999 end
     
-    if itemFrame then
-        -- METODE SCAN: Cari text apapun yang punya angka di dalam folder item ini
-        for _, obj in pairs(itemFrame:GetDescendants()) do
-            if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-                local text = obj.Text
-                
-                -- Filter: Abaikan nama dadu itu sendiri, cari angka
-                -- Logika: Jika text mengandung angka DAN (bukan nama dadu atau mengandung kata kunci)
-                local hasNumber = string.match(text, "%d+")
-                
-                if hasNumber then
-                    -- Bersihkan text, ambil angkanya saja
-                    -- Contoh: "Stock: 67" -> 67
-                    local stockNum = tonumber(string.match(text, "%d+"))
-                    
-                    -- Validasi tambahan: Stock biasanya tidak mungkin sama persis dengan nama dadu
-                    if stockNum and text ~= diceName then
-                        return stockNum
-                    end
-                end
-            end
-        end
-        
-        -- JIKA GAGAL DI FOLDER ITEM, CEK OPSI 'OPTIONS.BUYMAX' (EXPERIMENTAL)
-        -- Ini hanya bekerja jika item tersebut SEDANG DIPILIH di game
-        -- Risiko: Bisa salah baca jika UI menampilkan dadu yang berbeda
-        local optionsFrame = ShopState.ShopContainer:FindFirstChild("OPTIONS")
-        if optionsFrame then
-             local buyMaxBtn = optionsFrame:FindFirstChild("BUYMAX") or optionsFrame:FindFirstChild("BUY MAX")
-             if buyMaxBtn and buyMaxBtn:IsA("TextButton") then
-                 local text = buyMaxBtn.Text -- Misal: "Buy Max (67)"
-                 local stockNum = tonumber(string.match(text, "%d+"))
-                 if stockNum then return stockNum end
-             end
-        end
+    local text = ShopState.TimerLabel.Text
+    
+    -- Jika teksnya "Restocking..." atau "00:00", return 0
+    if string.find(string.lower(text), "stock") or text == "00:00" then
+        return 0
+    end
+
+    -- Pattern Matching MM:SS
+    local min, sec = text:match("(%d+):(%d+)")
+    if min and sec then
+        return (tonumber(min) * 60) + tonumber(sec)
     end
     
-    -- Fallback: Jika script buta (tidak nemu angka), asumsikan stock banyak
-    -- Agar script tetap jalan mencoba membeli
+    return 9999 -- Return angka besar jika format tidak dikenal
+end
+
+-- [3. HELPER: GET STOCK (Dari script sebelumnya)]
+local function GetCurrentStock(diceName)
+    if not ShopState.ShopContainer then return 9999 end
+    local itemFrame = ShopState.ShopContainer:FindFirstChild(diceName)
+    if itemFrame then
+        for _, obj in pairs(itemFrame:GetDescendants()) do
+            if (obj:IsA("TextLabel") or obj:IsA("TextButton")) and string.match(obj.Text, "%d+") then
+                local stockNum = tonumber(string.match(obj.Text, "%d+"))
+                if stockNum and obj.Text ~= diceName then return stockNum end
+            end
+        end
+    end
     return 9999 
 end
 
--- [CORE ENGINE]
-local function ProcessPurchase()
+-- [4. CORE ACTION: SINGLE BATCH BUY]
+-- Fungsi ini akan dipanggil 2x saat trigger aktif
+local function ExecuteBatchBuy()
+    -- [FIX 1] Safety Check Terakhir: Jangan beli jika toggle sudah mati
+    if not ShopState.IsSniperActive then 
+        warn("⚠️ Buy Cancelled: Sniper was turned off!")
+        return 
+    end
+
+    if #ShopState.SelectedDice > 0 and ShopState.Remote then
+        for _, diceName in pairs(ShopState.SelectedDice) do
+            task.spawn(function()
+                if diceName ~= "None" then
+                    local currentStock = GetCurrentStock(diceName)
+                    local finalQty = math.min(ShopState.MaxQuantity, currentStock)
+                    
+                    if finalQty > 0 then
+                        pcall(function()
+                            local args = {
+                                [1] = diceName,
+                                [2] = finalQty, 
+                                [3] = "dice"
+                            }
+                            ShopState.Remote:InvokeServer(unpack(args))
+                        end)
+                    end
+                end
+            end)
+        end
+    else
+        Rayfield:Notify({Title="Warning", Content="Pilih Dadu Dulu!", Duration=2})
+    end
+end
+
+-- [5. MAIN SNIPER LOOP]
+local function StartSniperLoop()
     task.spawn(function()
-        while ShopState.IsAutoBuying do
-            if ShopState.Remote and #ShopState.SelectedDice > 0 then
+        while ShopState.IsSniperActive do
+            -- Pastikan Path Ready
+            if not ShopState.TimerLabel then InitPaths() end
+            
+            local seconds = GetSecondsLeft()
+            
+            -- [LOGIKA UTAMA]
+            if seconds <= 1 and not ShopState.HasBoughtThisCycle then
                 
-                for _, diceName in pairs(ShopState.SelectedDice) do
-                    task.spawn(function()
-                        if diceName ~= "None" and diceName ~= "No Dice Found" then
-                            
-                            -- 1. Baca Stock
-                            local currentStock = GetCurrentStock(diceName)
-                            
-                            -- 2. Hitung Safety Limit
-                            -- Jika currentStock 9999 (gagal baca), dia akan ikut MaxQuantity user
-                            local finalQty = math.min(ShopState.MaxQuantity, currentStock)
-                            
-                            if finalQty > 0 then
-                                pcall(function()
-                                    local args = {
-                                        [1] = diceName,
-                                        [2] = finalQty, 
-                                        [3] = "dice"
-                                    }
-                                    ShopState.Remote:InvokeServer(unpack(args))
-                                    print("🛒 Buy: " .. diceName .. " | Qty: " .. finalQty .. " (Detected Stock: " .. currentStock .. ")")
-                                end)
-                            end
-                        end
-                    end)
+                Rayfield:Notify({Title="Timer Shop Dice", Content="Timer 0! Waiting 1.5s...", Duration=2})
+                
+                -- Script tidur disini menunggu server update stock...
+                task.wait(1.5) 
+                
+                -- [FIX 2 - CRUCIAL]
+                -- Bangun dari tidur, CEK LAGI apakah toggle masih nyala?
+                -- Jika user mematikan toggle saat menunggu 1.5s tadi, kita batalkan semua.
+                if not ShopState.IsSniperActive then 
+                    print("🛑 Sniper Cancelled during wait time.")
+                    break 
                 end
-                task.wait(ShopState.Delay)
-            else
-                if ShopState.IsAutoBuying and #ShopState.SelectedDice == 0 then
-                   Rayfield:Notify({Title="Warning", Content="Pilih Dadu Dulu!", Duration=3})
-                   ShopState.IsAutoBuying = false
-                   break
-                end
-                task.wait(1)
+                
+                -- EKSEKUSI 1
+                print(">>> EXECUTING BUY 1 <<<")
+                ExecuteBatchBuy()
+                
+                task.wait(0.5) 
+                
+                -- [FIX 3] Cek lagi sebelum serangan kedua
+                if not ShopState.IsSniperActive then break end
+
+                -- EKSEKUSI 2
+                print(">>> EXECUTING BUY 2 <<<")
+                ExecuteBatchBuy()
+                
+                ShopState.HasBoughtThisCycle = true
+                Rayfield:Notify({Title="Timer Shop Dice", Content="Execution Done. Waiting reset...", Duration=2})
+            
+            elseif seconds > 10 then
+                ShopState.HasBoughtThisCycle = false
             end
+            
+            task.wait(0.5)
         end
     end)
 end
 
 -- [UI COMPONENTS]
+
+local StatusLabel = ShopTab:CreateLabel("Timer Shop Dice: OFF")
 
 local DiceDropdown = ShopTab:CreateDropdown({
    Name = "Select Dice Target",
@@ -401,7 +438,7 @@ local DiceDropdown = ShopTab:CreateDropdown({
 })
 
 local QtySlider = ShopTab:CreateSlider({
-   Name = "Max Buy Quantity (Target)",
+   Name = "Max Quantity per Buy",
    Range = {1, 999},
    Increment = 1,
    Suffix = "Items",
@@ -412,159 +449,215 @@ local QtySlider = ShopTab:CreateSlider({
    end,
 })
 
-local DelaySlider = ShopTab:CreateSlider({
-   Name = "Server Cooldown (Delay)",
-   Range = {0.1, 2.0},
-   Increment = 0.1,
-   Suffix = "Seconds",
-   CurrentValue = 0.6,
-   Flag = "sliderDelayBuy",
-   Callback = function(Value)
-       ShopState.Delay = Value
-   end,
-})
-
 local Toggle = ShopTab:CreateToggle({
    Name = "Auto Buy Selected Dice",
    CurrentValue = false,
-   Flag = "ToggleAutoBuyDice", 
+   Flag = "ToggleBuyDice", 
    Callback = function(Value)
-       ShopState.IsAutoBuying = Value
+       ShopState.IsSniperActive = Value
+       
        if Value then
-           InitShopPath() -- Refresh path saat start
-           if not ShopState.Remote then InitRemote() end
-           Rayfield:Notify({Title="System", Content="Smart Buy Started", Duration=2})
-           ProcessPurchase()
+           InitPaths()
+           Rayfield:Notify({Title="Timer Shop Dice", Content="Waiting for Restock Timer...", Duration=3})
+           StatusLabel:Set("Timer Shop Dice Status: WATCHING TIMER...")
+           StartSniperLoop()
        else
-           Rayfield:Notify({Title="System", Content="Stopped", Duration=2})
+           StatusLabel:Set("Timer Shop Dice Status: OFF")
+           Rayfield:Notify({Title="Timer Shop Dice", Content="Deactivated", Duration=2})
        end
    end,
 })
 
-local ShopSection = ShopTab:CreateSection("Potion Shop (RESTOCK TARGET)")
+-- Monitor UI Realtime (Visual Feedback)
+task.spawn(function()
+    while true do
+        if ShopState.IsSniperActive and ShopState.TimerLabel then
+             local txt = ShopState.TimerLabel.Text
+             if ShopState.HasBoughtThisCycle then
+                 StatusLabel:Set("Status: BOUGHT! Waiting next cycle... ("..txt..")")
+             else
+                 StatusLabel:Set("Status: Waiting... ("..txt..")")
+             end
+        end
+        task.wait(1)
+    end
+end)
+
+local ShopSection = ShopTab:CreateSection("Potion Shop")
 
 -- [DATA & STATE]
 local ShopState = {
     SelectedPotion = {},
     MasterList = potionOptions, 
-    IsAutoBuying = false,
-    Delay = 0.6, 
+    IsSniperActive = false, -- Toggle Utama
     MaxQuantity = 999, 
     Remote = nil,
-    ShopContainer = nil 
+    ShopContainer = nil,
+    TimerLabel = nil, -- Akan diisi otomatis
+    
+    -- State Internal untuk mencegah spam saat timer 0
+    HasBoughtThisCycle = false 
 }
 
--- [INIT PATH: TARGET RESTOCK]
--- Sesuai temuan Anda: PlayerGui.Main.Restock.ScrollingFrame
-local function InitShopPath()
+-- [1. INIT PATHS]
+local function InitPaths()
     local plr = game:GetService("Players").LocalPlayer
     local pGui = plr:WaitForChild("PlayerGui")
     
-    local success, result = pcall(function()
-        return pGui:WaitForChild("Main"):WaitForChild("Potions"):WaitForChild("ScrollingFrame")
-    end)
-    
-    if success and result then
-        ShopState.ShopContainer = result
-        print("✅ [SYSTEM] Target Shop Ditemukan: " .. result:GetFullName())
-    else
-        warn("⚠️ [SYSTEM] Gagal menemukan 'Restock.ScrollingFrame'. Buka menu Shop dulu!")
-    end
-end
-task.spawn(InitShopPath)
-
--- [INIT REMOTE]
-local function InitRemote()
+    -- Init Remote
     if not ShopState.Remote then
-        local success, result = pcall(function()
+        local s, r = pcall(function()
             return game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buy")
         end)
-        if success then ShopState.Remote = result end
+        if s then ShopState.Remote = r end
+    end
+
+    -- Init Shop Container (Untuk baca stock - Opsional tapi bagus)
+    if not ShopState.ShopContainer then
+        local s, r = pcall(function()
+            return pGui:WaitForChild("Main"):WaitForChild("Potions"):WaitForChild("ScrollingFrame")
+        end)
+        if s then ShopState.ShopContainer = r end
+    end
+
+    -- Init Timer Label (CRUCIAL)
+    if not ShopState.TimerLabel then
+        local s, r = pcall(function()
+            return pGui:WaitForChild("Main"):WaitForChild("Potions"):WaitForChild("Header"):WaitForChild("restock_dur")
+        end)
+        if s then 
+            ShopState.TimerLabel = r 
+            print("✅ Timer Shop Potion Found: " .. r:GetFullName())
+        else
+            warn("⚠️ Gagal menemukan Timer")
+        end
     end
 end
-InitRemote()
+task.spawn(InitPaths)
 
--- [THE EYES: SCANNER STOCK CERDAS]
-local function GetCurrentStock(potionName)
-    if not ShopState.ShopContainer then InitShopPath() end
-    if not ShopState.ShopContainer then return 9999 end
-
-    local itemFrame = ShopState.ShopContainer:FindFirstChild(potionName)
+-- [2. HELPER: PARSE TIMER]
+-- Mengubah "01:30" menjadi detik (90)
+local function GetSecondsLeft()
+    if not ShopState.TimerLabel then return 9999 end
     
-    if itemFrame then
-        -- METODE SCAN: Cari text apapun yang punya angka di dalam folder item ini
-        for _, obj in pairs(itemFrame:GetDescendants()) do
-            if obj:IsA("TextLabel") or obj:IsA("TextButton") then
-                local text = obj.Text
-                
-                local hasNumber = string.match(text, "%d+")
-                
-                if hasNumber then
-                    local stockNum = tonumber(string.match(text, "%d+"))
-                    
-                    if stockNum and text ~= potionName then
-                        return stockNum
-                    end
-                end
-            end
-        end
-        
-        local optionsFrame = ShopState.ShopContainer:FindFirstChild("OPTIONS")
-        if optionsFrame then
-             local buyMaxBtn = optionsFrame:FindFirstChild("BUYMAX") or optionsFrame:FindFirstChild("BUY MAX")
-             if buyMaxBtn and buyMaxBtn:IsA("TextButton") then
-                 local text = buyMaxBtn.Text
-                 local stockNum = tonumber(string.match(text, "%d+"))
-                 if stockNum then return stockNum end
-             end
-        end
+    local text = ShopState.TimerLabel.Text
+    
+    -- Jika teksnya "Restocking..." atau "00:00", return 0
+    if string.find(string.lower(text), "stock") or text == "00:00" then
+        return 0
+    end
+
+    -- Pattern Matching MM:SS
+    local min, sec = text:match("(%d+):(%d+)")
+    if min and sec then
+        return (tonumber(min) * 60) + tonumber(sec)
     end
     
+    return 9999 -- Return angka besar jika format tidak dikenal
+end
+
+-- [3. HELPER: GET STOCK (Dari script sebelumnya)]
+local function GetCurrentStock(potionName)
+    if not ShopState.ShopContainer then return 9999 end
+    local itemFrame = ShopState.ShopContainer:FindFirstChild(potionName)
+    if itemFrame then
+        for _, obj in pairs(itemFrame:GetDescendants()) do
+            if (obj:IsA("TextLabel") or obj:IsA("TextButton")) and string.match(obj.Text, "%d+") then
+                local stockNum = tonumber(string.match(obj.Text, "%d+"))
+                if stockNum and obj.Text ~= potionName then return stockNum end
+            end
+        end
+    end
     return 9999 
 end
 
--- [CORE ENGINE]
-local function ProcessPurchase()
+-- [4. CORE ACTION: SINGLE BATCH BUY]
+-- Fungsi ini akan dipanggil 2x saat trigger aktif
+local function ExecuteBatchBuy()
+    -- [FIX 1] Safety Check Terakhir: Jangan beli jika toggle sudah mati
+    if not ShopState.IsSniperActive then 
+        warn("⚠️ Buy Cancelled: Sniper was turned off!")
+        return 
+    end
+
+    if #ShopState.SelectedPotion > 0 and ShopState.Remote then
+        for _, potionName in pairs(ShopState.SelectedPotion) do
+            task.spawn(function()
+                if potionName ~= "None" then
+                    local currentStock = GetCurrentStock(potionName)
+                    local finalQty = math.min(ShopState.MaxQuantity, currentStock)
+                    
+                    if finalQty > 0 then
+                        pcall(function()
+                            local args = {
+                                [1] = potionName,
+                                [2] = finalQty, 
+                                [3] = "potion"
+                            }
+                            ShopState.Remote:InvokeServer(unpack(args))
+                        end)
+                    end
+                end
+            end)
+        end
+    else
+        Rayfield:Notify({Title="Warning", Content="Pilih Potion Dulu!", Duration=2})
+    end
+end
+
+-- [5. MAIN SNIPER LOOP]
+local function StartSniperLoop()
     task.spawn(function()
-        while ShopState.IsAutoBuying do
-            if ShopState.Remote and #ShopState.SelectedPotion > 0 then
+        while ShopState.IsSniperActive do
+            -- Pastikan Path Ready
+            if not ShopState.TimerLabel then InitPaths() end
+            
+            local seconds = GetSecondsLeft()
+            
+            -- [LOGIKA UTAMA]
+            if seconds <= 1 and not ShopState.HasBoughtThisCycle then
                 
-                for _, potionName in pairs(ShopState.SelectedPotion) do
-                    task.spawn(function()
-                        if potionName ~= "None" and potionName ~= "No Potion Found" then
-                            
-                            local currentStock = GetCurrentStock(potionName)
-                            
-                            local finalQty = math.min(ShopState.MaxQuantity, currentStock)
-                            
-                            if finalQty > 0 then
-                                pcall(function()
-                                    local args = {
-                                        [1] = potionName,
-                                        [2] = finalQty, 
-                                        [3] = "potion"
-                                    }
-                                    ShopState.Remote:InvokeServer(unpack(args))
-                                    print("🛒 Buy: " .. potionName .. " | Qty: " .. finalQty .. " (Detected Stock: " .. currentStock .. ")")
-                                end)
-                            end
-                        end
-                    end)
+                Rayfield:Notify({Title="Timer Shop Potion", Content="Timer 0! Waiting 1.5s...", Duration=2})
+                
+                -- Script tidur disini menunggu server update stock...
+                task.wait(1.5) 
+                
+                -- [FIX 2 - CRUCIAL]
+                -- Bangun dari tidur, CEK LAGI apakah toggle masih nyala?
+                -- Jika user mematikan toggle saat menunggu 1.5s tadi, kita batalkan semua.
+                if not ShopState.IsSniperActive then 
+                    print("🛑 Sniper Cancelled during wait time.")
+                    break 
                 end
-                task.wait(ShopState.Delay)
-            else
-                if ShopState.IsAutoBuying and #ShopState.SelectedPotion == 0 then
-                   Rayfield:Notify({Title="Warning", Content="Pilih Dadu Dulu!", Duration=3})
-                   ShopState.IsAutoBuying = false
-                   break
-                end
-                task.wait(1)
+                
+                -- EKSEKUSI 1
+                print(">>> EXECUTING BUY 1 <<<")
+                ExecuteBatchBuy()
+                
+                task.wait(0.5) 
+                
+                -- [FIX 3] Cek lagi sebelum serangan kedua
+                if not ShopState.IsSniperActive then break end
+
+                -- EKSEKUSI 2
+                print(">>> EXECUTING BUY 2 <<<")
+                ExecuteBatchBuy()
+                
+                ShopState.HasBoughtThisCycle = true
+                Rayfield:Notify({Title="Timer Shop Potion", Content="Execution Done. Waiting reset...", Duration=2})
+            
+            elseif seconds > 10 then
+                ShopState.HasBoughtThisCycle = false
             end
+            
+            task.wait(0.5)
         end
     end)
 end
 
 -- [UI COMPONENTS]
+
+local StatusLabel = ShopTab:CreateLabel("Timer Shop Potion: OFF")
 
 local PotionDropdown = ShopTab:CreateDropdown({
    Name = "Select Potion Target",
@@ -578,7 +671,7 @@ local PotionDropdown = ShopTab:CreateDropdown({
 })
 
 local QtySlider = ShopTab:CreateSlider({
-   Name = "Max Buy Quantity (Target)",
+   Name = "Max Quantity per Buy",
    Range = {1, 999},
    Increment = 1,
    Suffix = "Items",
@@ -589,96 +682,160 @@ local QtySlider = ShopTab:CreateSlider({
    end,
 })
 
-local DelaySlider = ShopTab:CreateSlider({
-   Name = "Server Cooldown (Delay)",
-   Range = {0.1, 2.0},
-   Increment = 0.1,
-   Suffix = "Seconds",
-   CurrentValue = 0.6,
-   Flag = "sliderDelayBuy",
-   Callback = function(Value)
-       ShopState.Delay = Value
-   end,
-})
-
 local Toggle = ShopTab:CreateToggle({
-   Name = "Auto Buy Selected Potions",
+   Name = "Auto Buy Selected Potion",
    CurrentValue = false,
-   Flag = "ToggleAutoBuyPotions", 
+   Flag = "ToggleBuyPotion", 
    Callback = function(Value)
-       ShopState.IsAutoBuying = Value
+       ShopState.IsSniperActive = Value
+       
        if Value then
-           InitShopPath() -- Refresh path saat start
-           if not ShopState.Remote then InitRemote() end
-           Rayfield:Notify({Title="System", Content="Smart Buy Started", Duration=2})
-           ProcessPurchase()
+           InitPaths()
+           Rayfield:Notify({Title="Timer Shop Potion", Content="Waiting for Restock Timer...", Duration=3})
+           StatusLabel:Set("Timer Shop Potion Status: WATCHING TIMER...")
+           StartSniperLoop()
        else
-           Rayfield:Notify({Title="System", Content="Stopped", Duration=2})
+           StatusLabel:Set("Timer Shop Potion Status: OFF")
+           Rayfield:Notify({Title="Timer Shop Potion", Content="Deactivated", Duration=2})
        end
    end,
 })
 
+-- Monitor UI Realtime (Visual Feedback)
+task.spawn(function()
+    while true do
+        if ShopState.IsSniperActive and ShopState.TimerLabel then
+             local txt = ShopState.TimerLabel.Text
+             if ShopState.HasBoughtThisCycle then
+                 StatusLabel:Set("Status: BOUGHT! Waiting next cycle... ("..txt..")")
+             else
+                 StatusLabel:Set("Status: Waiting... ("..txt..")")
+             end
+        end
+        task.wait(1)
+    end
+end)
+
 local ShopSection = ShopTab:CreateSection("Pet Shop")
 
-local selectPetOptions = {}
+-- [STATE MANAGEMENT]
+local PetShopState = {
+    SelectedPets = {},
+    IsAutoBuying = false,
+    Delay = 1.1, 
+    Quantity = 1, -- Default jumlah beli
+    Remote = nil 
+}
 
-local Dropdown = ShopTab:CreateDropdown({
-   Name = "Select Pet",
+-- [INIT REMOTE]
+local function InitPetRemote()
+    if not PetShopState.Remote then
+        local success, result = pcall(function()
+            return game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RegularPet")
+        end)
+        if success then 
+            PetShopState.Remote = result 
+        else
+            warn("⚠️ Gagal menemukan Remote 'RegularPet'")
+        end
+    end
+end
+task.spawn(InitPetRemote)
+
+-- [CORE LOGIC]
+local function StartPetBuying()
+    task.spawn(function()
+        while PetShopState.IsAutoBuying do
+            if PetShopState.Remote then
+                
+                for _, petName in pairs(PetShopState.SelectedPets) do
+                    if not PetShopState.IsAutoBuying then break end
+                    
+                    if petName ~= "None" then
+                        pcall(function()
+                            -- [MODIFIKASI PAYLOAD]
+                            local args = {
+                                [1] = petName, 
+                                [2] = PetShopState.Quantity -- Menggunakan nilai dari Slider
+                            }
+                            
+                            PetShopState.Remote:InvokeServer(unpack(args))
+                            print("🥚 Buying: " .. petName .. " | Amount: " .. PetShopState.Quantity)
+                        end)
+                        
+                        task.wait(0.1)
+                    end
+                end
+            end
+            task.wait(PetShopState.Delay)
+        end
+    end)
+end
+
+-- [UI COMPONENTS]
+
+local PetDropdown = ShopTab:CreateDropdown({
+   Name = "Select Egg/Pet",
    Options = petOptions,
    CurrentOption = {"None"},
    MultipleOptions = true,
-   Flag = "dropdown2", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Flag = "dropdownPet",
    Callback = function(Option)
-        selectPetOptions = Option
+       PetShopState.SelectedPets = Option
    end,
 })
 
-_G.AutoBuyPetLoop = false
-_G.AutoBuyPetDelay = 1.1 -- Saya set sedikit di atas 1 detik karena InvokeServer butuh waktu respon
+-- [SLIDER KUANTITAS BARU]
+local QtySlider = ShopTab:CreateSlider({
+   Name = "Buy Quantity (Amount)",
+   Range = {1, 100},
+   Increment = 1,
+   Suffix = "Pets",
+   CurrentValue = 1,
+   Flag = "sliderPetQty",
+   Callback = function(Value)
+       PetShopState.Quantity = Value
+   end,
+})
+
+local DelaySlider = ShopTab:CreateSlider({
+   Name = "Buying Delay",
+   Range = {0.5, 5.0},
+   Increment = 0.1,
+   Suffix = "Seconds",
+   CurrentValue = 1.1,
+   Flag = "sliderPetDelay",
+   Callback = function(Value)
+       PetShopState.Delay = Value
+   end,
+})
 
 local Toggle = ShopTab:CreateToggle({
    Name = "Auto Buy Selected Pets",
    CurrentValue = false,
    Flag = "ToggleAutoBuyPets",
    Callback = function(Value)
-       _G.AutoBuyPetLoop = Value
+       PetShopState.IsAutoBuying = Value
+       
        if Value then
-           task.spawn(function()
-               while _G.AutoBuyPetLoop do
-                   -- Cek apakah user sudah memilih dadu di dropdown
-                   if #selectPetOptions > 0 then
-                       for _, petName in pairs(selectPetOptions) do
-                           if not _G.AutoBuyPetLoop then break end 
-                           
-                           pcall(function()
-                               -- MENYUSUN ARGUMEN (Payload)
-                               local args = {
-                                   [1] = petName,  -- Arg 1: Nama dice (Dinamis dari loop)
-                                   [2] = 1,         -- Arg 2: Jumlah (Statik, sesuai spy)
-                               }
-                               
-                               -- EKSEKUSI REMOTE
-                               -- Menggunakan InvokeServer sesuai data RemoteSpy Anda
-                               game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("RegularPet"):InvokeServer(unpack(args))
-                               
-                           end)
-                           
-                           task.wait(0.1) -- Jeda mikro agar tidak crash jika beli banyak tipe sekaligus
-                       end
-                   else
-                       -- Feedback visual jika lupa pilih item
-                       Rayfield:Notify({
-                           Title = "System",
-                           Content = "Pilih egg dulu di menu dropdown!",
-                           Duration = 3,
-                           Image = 4483362458
-                       })
-                       _G.AutoBuyPetLoop = false 
-                   end
-                   
-                   task.wait(_G.AutoBuyPetDelay)
-               end
-           end)
+           -- Validasi
+           if #PetShopState.SelectedPets == 0 or (#PetShopState.SelectedPets == 1 and PetShopState.SelectedPets[1] == "None") then
+               Rayfield:Notify({
+                   Title = "Warning",
+                   Content = "Pilih Egg dulu di menu dropdown!",
+                   Duration = 3,
+                   Image = 4483362458
+               })
+               PetShopState.IsAutoBuying = false
+               return 
+           end
+
+           if not PetShopState.Remote then InitPetRemote() end
+           
+           Rayfield:Notify({Title="System", Content="Auto Buy Started (Qty: "..PetShopState.Quantity..")", Duration=2})
+           StartPetBuying()
+       else
+           Rayfield:Notify({Title="System", Content="Stopped", Duration=2})
        end
    end,
 })
@@ -806,3 +963,131 @@ local Toggle = OtherTab:CreateToggle({
        end
    end,
 })
+
+-- Custom Path Explorer
+local customPathDebug = ""
+
+local DebugPathInput = OtherTab:CreateInput({
+   Name = "🔍 Custom Path Explorer",
+   PlaceholderText = "input",
+   RemoveTextAfterFocusLost = false,
+   Callback = function(Text)
+        customPathDebug = Text
+   end,
+})
+
+local function exploreCustomPath(pathString)
+    if pathString == "" then
+        print("[ERROR] Path tidak boleh kosong!")
+        return
+    end
+    
+    local success, result = pcall(function()
+        return loadstring("return " .. pathString)()
+    end)
+    
+    if not success or result == nil then
+        print("\n[❌ ERROR] Path tidak valid: " .. pathString)
+        print("[💡 TIP] Pastikan path Lua yang benar\n")
+        return
+    end
+    
+    -- Path valid - tampilkan info lengkap
+    local console = "\n" .. string.rep("═", 75)
+    console = console .. "\n✓ CUSTOM PATH EXPLORER - PATH VALID"
+    console = console .. "\n" .. string.rep("═", 75)
+    console = console .. "\n\n📍 INPUT PATH:\n   " .. pathString
+    
+    local obj = result
+    local objType = type(obj)
+    
+    -- Info dasar
+    console = console .. "\n\n📊 OBJECT INFO:"
+    console = console .. "\n   • Type: " .. objType
+    if typeof then
+        console = console .. "\n   • Class: " .. typeof(obj)
+    end
+    console = console .. "\n   • Reference: " .. tostring(obj)
+    
+    -- Properties untuk Instance
+    if typeof and typeof(obj) == "Instance" then
+        console = console .. "\n\n🏷️ PROPERTIES:"
+        local props = {"Name", "Parent", "ClassName", "Enabled"}
+        for _, prop in ipairs(props) do
+            local pSuccess, pValue = pcall(function() return obj[prop] end)
+            if pSuccess then
+                local pType = type(pValue)
+                if pType == "userdata" or (typeof and typeof(pValue) == "Instance") then
+                    console = console .. "\n   • " .. prop .. " (" .. pType .. "): " .. (typeof and typeof(pValue) or type(pValue))
+                else
+                    console = console .. "\n   • " .. prop .. " (" .. pType .. "): " .. tostring(pValue)
+                end
+            end
+        end
+    end
+    
+    -- Children
+    if (typeof and typeof(obj) == "Instance") or (objType == "table" and obj.GetChildren) then
+        local children = obj:GetChildren()
+        console = console .. "\n\n👶 CHILDREN: " .. #children
+        
+        if #children == 0 then
+            console = console .. "\n   [Tidak ada children]"
+        else
+            console = console .. "\n   " .. string.rep("─", 70)
+            for i, child in ipairs(children) do
+                local childType = typeof(child) or type(child)
+                console = console .. "\n   [" .. i .. "] " .. child.Name .. " (" .. childType .. ")"
+            end
+        end
+    end
+    
+    -- Table content (untuk table yang bukan Instance)
+    if objType == "table" and not (typeof and typeof(obj) == "Instance") then
+        console = console .. "\n\n📦 TABLE CONTENTS:"
+        console = console .. "\n   " .. string.rep("─", 70)
+        
+        local keyCount = 0
+        for k, v in pairs(obj) do
+            keyCount = keyCount + 1
+            local vType = type(v)
+            if vType == "table" then
+                console = console .. "\n   • " .. tostring(k) .. " (table) → {...}"
+            elseif vType == "function" then
+                console = console .. "\n   • " .. tostring(k) .. " (function)"
+            else
+                console = console .. "\n   • " .. tostring(k) .. " (" .. vType .. "): " .. tostring(v)
+            end
+        end
+        console = console .. "\n   Total keys: " .. keyCount
+    end
+    
+    console = console .. "\n\n" .. string.rep("═", 75) .. "\n"
+    print(console)
+end
+
+local ExplorePathButton = OtherTab:CreateButton({
+   Name = "▶️ Explore Path",
+   Callback = function()
+        if customPathDebug == "" then
+            Rayfield:Notify({
+                Title = "Input Error",
+                Content = "Masukkan path dulu!",
+                Duration = 2,
+                Image = 4483362458
+            })
+            return
+        end
+        
+        exploreCustomPath(customPathDebug)
+        
+        Rayfield:Notify({
+            Title = "Explorer",
+            Content = "✓ Check F9 console untuk hasil!",
+            Duration = 2,
+            Image = 13047715178
+        })
+   end,
+})
+
+
