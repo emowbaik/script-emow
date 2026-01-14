@@ -217,9 +217,12 @@ local function GetPlayerDice()
     -- Coba berbagai path untuk mencari data dice
     local possiblePaths = {
         replicatedStorage:FindFirstChild("PlayerData"),
-        replicatedStorage:FindFirstChild("Data"),
+        replicatedStorage:FindFirstChild("Dice"),
+        replicatedStorage:FindFirstChild("updateRollingDice"),
         player:FindFirstChild("PlayerData"),
-        player:FindFirstChild("Data")
+        player:FindFirstChild("Dice"),
+        player:FindFirstChild("updateRollingDice")
+
     }
     
     for _, path in ipairs(possiblePaths) do
@@ -235,7 +238,7 @@ local function GetPlayerDice()
     
     -- Jika tidak ada data, gunakan default
     if #diceList == 0 then
-        diceList = {"Starter World", "Pirate Island", "Pineapple Paradise"}
+        diceList = {"none"}
     end
     
     _G.AvailableDice = diceList
@@ -247,7 +250,7 @@ local diceOptions = GetPlayerDice()
 local Dropdown = FarmTab:CreateDropdown({
    Name = "Select Dice",
    Options = diceOptions,
-   CurrentOption = {diceOptions[1] or "Starter World"},
+   CurrentOption = {diceOptions[1] or "none"},
    MultipleOptions = false,
    Flag = "dropdownarea1",
    Callback = function(Option)
