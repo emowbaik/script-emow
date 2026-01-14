@@ -123,7 +123,7 @@ local Input = MainTab:CreateInput({
    end,
 })
 
-local FarmSection = FarmTab:CreateSection("Farm")
+local FarmSection = FarmTab:CreateSection("Coin Farm")
 
 _G.AutoCollectCoinsLoop = false
 _G.AutoCollectDelay = 2
@@ -147,6 +147,47 @@ local Toggle = FarmTab:CreateToggle({
 
 local DelayInput = FarmTab:CreateInput({
    Name = "Auto Collect Coins Delay (Seconds)",
+   PlaceholderText = "text here",
+   RemoveTextAfterFocusLost = true,
+   Callback = function(Text)
+        local delayValue = tonumber(Text)
+        if delayValue and delayValue > 0 then
+            _G.AutoCollectDelay = delayValue
+        else
+            Rayfield:Notify({
+                Title = "Input Error",
+                Content = "Masukkan angka positif untuk delay!",
+                Duration = 3,
+                Image = 4483362458
+            })
+        end
+   end,
+})
+
+local FarmSection = FarmTab:CreateSection("Dice Farm")
+
+_G.AutoRollDiceLoop = false
+_G.AutoRollDiceDelay = 2
+
+local Toggle = FarmTab:CreateToggle({
+   Name = "Auto Roll Dice",
+   CurrentValue = false,
+   Flag = "Toggle2", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+        _G.AutoRollDiceLoop = Value
+        if Value then
+            spawn(function()
+                while _G.AutoRollDiceLoop do
+                    game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("Main"):WaitForChild("Dice"):WaitForChild("RollState"):InvokeServer()
+                    wait(_G.AutoRollDiceDelay)
+                end
+            end)
+        end
+   end,
+})
+
+local DelayInput = FarmTab:CreateInput({
+   Name = "Auto Roll Dice Delay (Seconds)",
    PlaceholderText = "text here",
    RemoveTextAfterFocusLost = true,
    Callback = function(Text)
