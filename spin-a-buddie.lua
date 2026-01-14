@@ -103,8 +103,7 @@ Rayfield:Notify({
 local MainTab = Window:CreateTab("Main", nil) -- Title, Image
 local FarmTab = Window:CreateTab("Farm", nil) -- Title, Image
 local ShopTab = Window:CreateTab("Shop", nil) -- Title, Image
--- local MainSection = MainTab:CreateSection("Main")
--- local OtherSection = MainTab:CreateSection("Other")
+local OtherTab = Window:CreateTab("Other", nil) -- Title, Image
 
 local Button = MainTab:CreateButton({
    Name = "Infinite Jump Toggle",
@@ -448,3 +447,67 @@ local Toggle = ShopTab:CreateToggle({
        end
    end,
 })
+
+local OtherSection = OtherTab:CreateSection("Notification")
+
+local toggleHideNotification = OtherTab:CreateToggle({
+   Name = "Hide Notifications",
+   CurrentValue = false,
+   Flag = "ToggleHideNotifications",
+   Callback = function(Value)
+       _G.HideNotifications = Value
+
+       if Value then
+           -- Loop aktif untuk 'memaksa' ActiveNotification tetap sembunyi
+           task.spawn(function()
+               while _G.HideNotifications do
+                   pcall(function()
+                       local plr = game:GetService("Players").LocalPlayer
+                       if plr and plr:FindFirstChild("PlayerGui") then
+                           -- Navigasi aman step-by-step sesuai path Anda
+                           local gui = plr.PlayerGui:FindFirstChild("bot_not")
+                           if gui then
+                               local frame = gui:FindFirstChild("Frame")
+                               if frame then
+                                   local target = frame:FindFirstChild("ActiveNotification")
+                                   
+                                   -- HANYA matikan ActiveNotification
+                                   if target then
+                                       target.Visible = false
+                                       
+                                       -- Opsional: Matikan transparansi background jika masih terlihat kotak kosong
+                                       -- target.BackgroundTransparency = 1 
+                                   end
+                               end
+                           end
+                       end
+                   end)
+                   task.wait(0.1) -- Cek sangat cepat (10x per detik) agar tidak sempat berkedip
+               end
+           end)
+           
+           Rayfield:Notify({
+               Title = "System",
+               Content = "ActiveNotification Hidden",
+               Duration = 2,
+               Image = 4483362458
+           })
+       else
+           -- Restore: Kembalikan visibilitas saat toggle dimatikan
+           pcall(function()
+               local target = game:GetService("Players").LocalPlayer.PlayerGui.bot_not.Frame.ActiveNotification
+               if target then
+                   target.Visible = true
+               end
+           end)
+           
+           Rayfield:Notify({
+               Title = "System",
+               Content = "ActiveNotification Restored",
+               Duration = 2,
+               Image = 4483362458
+           })
+       end
+   end,
+})
+
