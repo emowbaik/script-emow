@@ -125,11 +125,21 @@ local Input = MainTab:CreateInput({
 
 local FarmSection = FarmTab:CreateSection("Farm")
 
+_G.AutoCollectCoinsLoop = false
+
 local Toggle = FarmTab:CreateToggle({
    Name = "Auto Collect Coins",
    CurrentValue = false,
    Flag = "Toggle1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
    Callback = function(Value)
-        print("FARMING")
+        _G.AutoCollectCoinsLoop = Value
+        if Value then
+            spawn(function()
+                while _G.AutoCollectCoinsLoop do
+                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("PlaceBestBaddies"):InvokeServer()
+                    wait(2) -- Delay between setiap eksekusi (ubah angka sesuai kebutuhan)
+                end
+            end)
+        end
    end,
 })
