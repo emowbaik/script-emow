@@ -511,3 +511,51 @@ local toggleHideNotification = OtherTab:CreateToggle({
    end,
 })
 
+-- Variabel global untuk menyimpan "kabel" koneksi agar bisa dicabut nanti
+_G.AntiAfkConnection = nil
+
+local Toggle = OtherTab:CreateToggle({
+   Name = "Anti-AFK Mode",
+   CurrentValue = false,
+   Flag = "ToggleAntiAFK",
+   Callback = function(Value)
+       local virtualUser = game:GetService("VirtualUser")
+       local player = game:GetService("Players").LocalPlayer
+
+       if Value then
+           -- === ENABLE ===
+           -- Pastikan tidak ada koneksi ganda sebelum membuat yang baru
+           if _G.AntiAfkConnection then
+               _G.AntiAfkConnection:Disconnect()
+           end
+
+           -- Kita simpan "objek koneksi"-nya ke dalam variabel
+           _G.AntiAfkConnection = player.Idled:Connect(function()
+               virtualUser:CaptureController()
+               virtualUser:ClickButton2(Vector2.new())
+               print("[Anti-AFK] System detected idle. Simulated input sent.")
+           end)
+
+           Rayfield:Notify({
+               Title = "System",
+               Content = "Anti-AFK Enabled (Protected)",
+               Duration = 3,
+               Image = 4483362458
+           })
+       else
+           -- === DISABLE ===
+           -- Jika koneksi ada, kita putuskan (cabut kabelnya)
+           if _G.AntiAfkConnection then
+               _G.AntiAfkConnection:Disconnect()
+               _G.AntiAfkConnection = nil -- Kosongkan variabel
+           end
+
+           Rayfield:Notify({
+               Title = "System",
+               Content = "Anti-AFK Disabled",
+               Duration = 3,
+               Image = 4483362458
+           })
+       end
+   end,
+})
