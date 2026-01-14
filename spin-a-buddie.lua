@@ -307,3 +307,70 @@ local Toggle = ShopTab:CreateToggle({
    end,
 })
 
+local ShopSection = ShopTab:CreateSection("Potion Shop")
+
+local selectPetOptions = {}
+
+local Dropdown = ShopTab:CreateDropdown({
+   Name = "Select Potion",
+   Options = potionOptions,
+   CurrentOption = {"Luck Potion 1"},
+   MultipleOptions = true,
+   Flag = "dropdown2", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Option)
+        selectPetOptions = Option
+   end,
+})
+
+_G.AutoBuyPetLoop = false
+_G.AutoBuyPotionDelay = 1.1 -- Saya set sedikit di atas 1 detik karena InvokeServer butuh waktu respon
+
+local Toggle = ShopTab:CreateToggle({
+   Name = "Auto Buy Selected Potions",
+   CurrentValue = false,
+   Flag = "ToggleAutoBuyPotions",
+   Callback = function(Value)
+       _G.AutoBuyPetLoop = Value
+       if Value then
+           task.spawn(function()
+               while _G.AutoBuyPetLoop do
+                   -- Cek apakah user sudah memilih dadu di dropdown
+                   if #selectPetOptions > 0 then
+                       for _, potionName in pairs(selectPetOptions) do
+                           if not _G.AutoBuyPetLoop then break end 
+                           
+                           pcall(function()
+                               -- MENYUSUN ARGUMEN (Payload)
+                               local args = {
+                                   [1] = potionName,  -- Arg 1: Nama dice (Dinamis dari loop)
+                                   [2] = 1,         -- Arg 2: Jumlah (Statik, sesuai spy)
+                                   [3] = "potion"     -- Arg 3: Tipe (Statik, sesuai spy)
+                               }
+                               
+                               -- EKSEKUSI REMOTE
+                               -- Menggunakan InvokeServer sesuai data RemoteSpy Anda
+                               game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("buy"):InvokeServer(unpack(args))
+                               
+                               print("Membeli: " .. potionName)
+                           end)
+                           
+                           task.wait(0.1) -- Jeda mikro agar tidak crash jika beli banyak tipe sekaligus
+                       end
+                   else
+                       -- Feedback visual jika lupa pilih item
+                       Rayfield:Notify({
+                           Title = "System",
+                           Content = "Pilih potion dulu di menu dropdown!",
+                           Duration = 3,
+                           Image = 4483362458
+                       })
+                       _G.AutoBuyPetLoop = false 
+                   end
+                   
+                   task.wait(_G.AutoBuyPotionDelay)
+               end
+           end)
+       end
+   end,
+})
+
