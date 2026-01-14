@@ -193,7 +193,7 @@ local DelayInput = FarmTab:CreateInput({
    Callback = function(Text)
         local delayValue = tonumber(Text)
         if delayValue and delayValue > 0 then
-            _G.AutoCollectDelay = delayValue
+            _G.AutoRollDiceDelay = delayValue
         else
             Rayfield:Notify({
                 Title = "Input Error",
@@ -202,5 +202,69 @@ local DelayInput = FarmTab:CreateInput({
                 Image = 4483362458
             })
         end
+   end,
+})
+
+_G.AvailableDice = {}
+
+local function GetPlayerDice()
+    local diceList = {}
+    local player = game:GetService("Players").LocalPlayer
+    
+    -- Coba ambil dari ReplicatedStorage
+    local replicatedStorage = game:GetService("ReplicatedStorage")
+    
+    -- Coba berbagai path untuk mencari data dice
+    local possiblePaths = {
+        replicatedStorage:FindFirstChild("PlayerData"),
+        replicatedStorage:FindFirstChild("Data"),
+        player:FindFirstChild("PlayerData"),
+        player:FindFirstChild("Data")
+    }
+    
+    for _, path in ipairs(possiblePaths) do
+        if path then
+            for _, item in ipairs(path:GetChildren()) do
+                table.insert(diceList, item.Name)
+            end
+            if #diceList > 0 then
+                break
+            end
+        end
+    end
+    
+    -- Jika tidak ada data, gunakan default
+    if #diceList == 0 then
+        diceList = {"Starter World", "Pirate Island", "Pineapple Paradise"}
+    end
+    
+    _G.AvailableDice = diceList
+    return diceList
+end
+
+local diceOptions = GetPlayerDice()
+
+local Dropdown = FarmTab:CreateDropdown({
+   Name = "Select Dice",
+   Options = diceOptions,
+   CurrentOption = {diceOptions[1] or "Starter World"},
+   MultipleOptions = false,
+   Flag = "dropdownarea1",
+   Callback = function(Option)
+        getgenv().SelectedDice = Option
+   end,
+})
+
+local RefreshButton = FarmTab:CreateButton({
+   Name = "Refresh Dice List",
+   Callback = function()
+        local updatedDice = GetPlayerDice()
+        Dropdown:Refresh(updatedDice, true)
+        Rayfield:Notify({
+            Title = "Success",
+            Content = "Dice list updated! Found " .. #updatedDice .. " dice.",
+            Duration = 3,
+            Image = 4483362458
+        })
    end,
 })
