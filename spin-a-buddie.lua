@@ -123,3 +123,13 @@ local Input = MainTab:CreateInput({
    end,
 })
 
+local OtherSection = MainTab:CreateSection("Farm")
+
+local Toggle = MainTab:CreateToggle({
+   Name = "Auto Collect Coins",
+   CurrentValue = false,
+   Flag = "Toggle1", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+   Callback = function(Value)
+        print("FARMING")
+   end,
+})
