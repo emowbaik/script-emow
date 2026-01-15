@@ -7,6 +7,9 @@ if getgenv().MspaintInstance then
     task.wait(0.2) 
 end
 
+------------------------------------------------------------------
+-- LIBRARY LOADING
+------------------------------------------------------------------
 local RunService = game:GetService("RunService")
 local Player = game:GetService("Players").LocalPlayer
 
@@ -17,7 +20,7 @@ local SaveManager = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
 
 getgenv().MspaintInstance = Library
 
--- Create a progress notification (steps = amount of steps)
+-- Loading Notification
 local Notification = Library:Notify({
     Title = "EMOW Script",
     Description = "Loading...",
@@ -34,6 +37,10 @@ Notification:Destroy()
 
 Library:Notify("Loaded successfully!✅", 2)
 
+
+------------------------------------------------------------------
+-- UI CODE
+------------------------------------------------------------------
 local Window = Library:CreateWindow({
     Title = "EMOW",
 	Footer = "develop by emow v1.0",
@@ -45,14 +52,16 @@ local Window = Library:CreateWindow({
 })
 
 local Tabs = {
-    Main = Window:AddTab("Main", "user"),
-    Farm = Window:AddTab("Farm", "mouse-pointer-click"),
+    MainTab = Window:AddTab("Main", "user"),
+    FarmTab = Window:AddTab("Farm", "mouse-pointer-click"),
+    ShopTab = Window:AddTab("Shop", "shopping-cart"),
+     = Window:AddTab("Misc", "settings-2"),
     ["UISettings"] = Window:AddTab("Settings", "settings"),
 }
 
 -- Main Tab
-local LeftGroupBox1 = Tabs.Main:AddLeftGroupbox("Player1", "user")
-local LeftGroupBox2 = Tabs.Main:AddLeftGroupbox("Player2", "user")
+local LeftGroupBox1 = Tabs.MainTab:AddLeftGroupbox("Player1", "user")
+local LeftGroupBox2 = Tabs.MainTab:AddLeftGroupbox("Player2", "user")
 
 LeftGroupBox1:AddLabel("LeftGroupBox1")
 LeftGroupBox2:AddLabel("LeftGroupBox2")
