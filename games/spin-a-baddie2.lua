@@ -106,11 +106,6 @@ local PlayerBox = Tabs.MainTab:AddRightGroupbox("Player Controls", "user")
 
 Information:AddLabel("Welcome to EMOW Spin a Baddie Script\n\nEnjoy your time!", true)
 
--- =================================================================
--- [FEATURE] PHOTO PLAYER INSIDE GROUPBOX
--- =================================================================
--- Kita menyuntikkan ImageLabel ke dalam 'Container' milik GroupBox
--- =================================================================
 if StatisticPlayer.Container then
     -- 1. Buat Container Foto (Agar rapi di tengah)
     local ImageFrame = Instance.new("Frame")
@@ -359,6 +354,89 @@ UserInputService.JumpRequest:Connect(function()
         end
     end
 end)
+
+-- =================================================================
+-- FARM TAB CONTENT
+-- =================================================================
+local AutoFarmCoins = Tabs.FarmTab:AddLeftGroupbox("Auto Farm Collect Coins", "mouse-pointer-click")
+local AutoFarmDices = Tabs.FarmTab:AddRightGroupbox("Auto Farm Rolling Dices", "mouse-pointer-click")
+
+
+-- Auto Collect Coins
+_G.AutoCollectCoinsLoop = false
+_G.AutoCollectDelay = 2
+AutoFarmCoins:AddToggle('AutoCollectCoinsToggle', {
+    Text = 'Auto Collect Coins',
+    Default = false,
+    Callback = function(Value)
+        _G.AutoCollectCoinsLoop = Value
+
+        if Value then
+            Library:Notify({Title="System", Description="Auto Collect Coins Enabled", Time=1})
+            task.spawn(function()
+                while _G.AutoCollectCoinsLoop do
+                    game:GetService("ReplicatedStorage"):WaitForChild("Events"):WaitForChild("PlaceBestBaddies"):InvokeServer()
+                    task.wait(_G.AutoCollectDelay)
+                end
+            end)
+        else
+            Library:Notify({Title="System", Description="Auto Collect Coins Disabled", Time=1})
+        end
+    end
+})
+
+AutoFarmCoins:AddSlider('AutoCollectDelaySlider', {
+    Text = 'Collect Delay (seconds)',
+    Default = 2,
+    Min = 0.5,
+    Max = 10,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(Value)
+        _G.AutoCollectDelay = Value
+    end
+})
+
+-- Auto Roll Dices
+_G.AutoRollDiceLoop = false
+_G.AutoRollDiceDelay = 0
+AutoFarmDices:AddToggle('AutoRollDiceToggle', {
+    Text = 'Auto Roll Dices',
+    Default = false,
+    Callback = function(Value)
+        _G.AutoRollDiceLoop = Value
+
+        if Value then
+            Library:Notify({Title="System", Description="Auto Roll Dices Enabled", Time=1})
+            task.spawn(function()
+                while _G.AutoRollDiceLoop do
+                    game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("Main"):WaitForChild("Dice"):WaitForChild("RollState"):InvokeServer()
+                    task.wait(_G.AutoRollDiceDelay)
+                end
+            end)
+        else
+            Library:Notify({Title="System", Description="Auto Roll Dices Disabled", Time=1})
+        end
+    end
+})
+
+AutoFarmDices:AddSlider('AutoRollDiceDelaySlider', {
+    Text = 'Roll Delay (seconds)',
+    Default = 0.5,
+    Min = 0.1,
+    Max = 5,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(Value)
+        _G.AutoRollDiceDelay = Value
+    end
+})
+
+------------------------------------------------------------------
+-- SHOP TAB CONTENT
+------------------------------------------------------------------
+
+
 
 ------------------------------------------------------------------
 -- SETTINGS & UNLOAD
