@@ -1,1 +1,0 @@
-loadstring(game:HttpGet("https://raw.githubusercontent.com/emowbaik/script-emow/master/games/spin-a-baddie-main.lua"))()
