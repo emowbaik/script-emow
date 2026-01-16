@@ -352,9 +352,9 @@ local AutoFarmCoins = Tabs.FarmTab:AddLeftGroupbox("Auto Farm Collect Coins", "m
 local AutoFarmDices = Tabs.FarmTab:AddRightGroupbox("Auto Farm Rolling Dices", "mouse-pointer-click")
 
 _G.AutoCollectCoinsLoop = false
-_G.AutoCollectDelay = 2
+_G.AutoCollectDelay = 10
 AutoFarmCoins:AddToggle('AutoCollectCoinsToggle', {
-    Text = 'Auto Collect Coins',
+    Text = 'Auto Place Best For Collect Coins',
     Default = false,
     Callback = function(Value)
         _G.AutoCollectCoinsLoop = Value
@@ -373,16 +373,18 @@ AutoFarmCoins:AddToggle('AutoCollectCoinsToggle', {
 
 AutoFarmCoins:AddSlider('AutoCollectDelaySlider', {
     Text = 'Collect Delay (s)',
-    Default = 2,
+    Default = 10,
     Min = 0.5,
-    Max = 10,
+    Max = 100,
     Rounding = 1,
     Compact = false,
     Callback = function(Value) _G.AutoCollectDelay = Value end
 })
 
+Library:AddLabel(AutoFarmCoins.Container, "Use a little longer delay to be safe.", true)
+
 _G.AutoRollDiceLoop = false
-_G.AutoRollDiceDelay = 0.5
+_G.AutoRollDiceDelay = 1
 AutoFarmDices:AddToggle('AutoRollDiceToggle', {
     Text = 'Auto Roll Dices',
     Default = false,
@@ -405,7 +407,7 @@ AutoFarmDices:AddSlider('AutoRollDiceDelaySlider', {
     Text = 'Roll Delay (s)',
     Default = 0.5,
     Min = 0.1,
-    Max = 5,
+    Max = 100,
     Rounding = 1,
     Compact = false,
     Callback = function(Value) _G.AutoRollDiceDelay = Value end
@@ -535,12 +537,12 @@ local function StartSniperLoop()
                 
                 -- print(">>> SNIPING 1 <<<")
                 ExecuteBatchBuy()
-                task.wait(0.5) 
+                -- task.wait(0.5) 
                 
-                if not ShopState.IsSniperActive then break end
+                -- if not ShopState.IsSniperActive then break end
 
-                -- print(">>> SNIPING 2 <<<")
-                ExecuteBatchBuy()
+                -- -- print(">>> SNIPING 2 <<<")
+                -- ExecuteBatchBuy()
                 
                 ShopState.HasBoughtThisCycle = true
                 -- Library:Notify({Title="System", Description="Attempted Buy! Waiting reset...", Time=2})
@@ -625,6 +627,18 @@ AutoBuyDices:AddToggle('AutoBuyAllDicesToggle', {
             Library:Notify({Title="System", Description="All Dices Deselected", Time=1})
         end
     end
+})
+
+AutoBuyDices:AddButton({
+    Text = 'Auto Buy All Dices Now',
+    Func = function()
+        ExecuteBatchBuy()
+        Library:Notify({
+            Title = "System",
+            Description = "Attempted to buy all selected dices.",
+            Time = 2
+        })
+    end,
 })
 
 AutoBuyDices:AddToggle('AutoBuySelectedDicesToggle', {
@@ -1097,58 +1111,121 @@ AutoBuyPets:AddToggle('AutoBuyPetsToggle', {
 -- FLOATING WIDGET SYSTEM
 -- =================================================================
 local function CreateFloatingWidget(config)
+    -- [1] Konfigurasi
     local Settings = {
-        Type = config.Type or "Icon", 
-        Content = config.Content, -- Nanti diisi otomatis
-        Size = config.Size or UDim2.new(0, 50, 0, 50),
-        Color = config.Color or Color3.fromRGB(0, 0, 0), 
-        StrokeColor = config.StrokeColor or Color3.fromRGB(255, 255, 255), 
-        Position = config.Position or UDim2.new(0.1, 0, 0.1, 0) 
+        Size = config.Size or UDim2.new(0, 160, 0, 50), -- Lebih lebar untuk muat logo+teks
+        Color = config.Color or Color3.fromRGB(15, 15, 15),
+        StrokeColor = config.StrokeColor or Color3.fromRGB(0, 255, 128),
+        Position = config.Position or UDim2.new(0.1, 0, 0.15, 0),
+        LogoContent = config.LogoContent or "" -- URL atau Asset ID Logo
     }
 
+    -- [2] Bersihkan Widget Lama
     if getgenv().FloatingWidgetInstance then
         getgenv().FloatingWidgetInstance:Destroy()
     end
 
     local CoreGui = game:GetService("CoreGui")
     local ScreenGui = Instance.new("ScreenGui")
-    ScreenGui.Name = "ObsidianFloatingWidget"
+    ScreenGui.Name = "ObsidianStatsWidget"
     ScreenGui.DisplayOrder = 10000 
     ScreenGui.Parent = CoreGui
     getgenv().FloatingWidgetInstance = ScreenGui 
 
+    -- [3] Frame Utama (Tombol Pembungkus)
     local MainFrame = Instance.new("TextButton") 
     MainFrame.Name = "WidgetFrame"
     MainFrame.Size = Settings.Size
     MainFrame.Position = Settings.Position
     MainFrame.BackgroundColor3 = Settings.Color
-    MainFrame.BackgroundTransparency = 0
+    MainFrame.BackgroundTransparency = 0.2
     MainFrame.Text = "" 
     MainFrame.AutoButtonColor = false
     MainFrame.Parent = ScreenGui
 
+    -- Styling
     local UICorner = Instance.new("UICorner")
-    UICorner.CornerRadius = UDim.new(1, 0)
+    UICorner.CornerRadius = UDim.new(0, 10)
     UICorner.Parent = MainFrame
 
     local UIStroke = Instance.new("UIStroke")
     UIStroke.Color = Settings.StrokeColor
-    UIStroke.Thickness = 2
+    UIStroke.Thickness = 1.5
     UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     UIStroke.Parent = MainFrame
     
-    -- Icon Image
-    local Icon = Instance.new("ImageLabel")
-    Icon.Name = "IconContent"
-    Icon.Size = UDim2.new(0.7, 0, 0.7, 0) -- Ukuran Logo agak besar dikit
-    Icon.Position = UDim2.new(0.15, 0, 0.15, 0) -- Tengah
-    Icon.BackgroundTransparency = 1
-    Icon.Image = Settings.Content
-    Icon.ScaleType = Enum.ScaleType.Fit
-    Icon.ZIndex = 2
-    Icon.Parent = MainFrame
+    -- [4] BAGIAN KIRI: LOGO
+    local LogoImage = Instance.new("ImageLabel")
+    LogoImage.Name = "LogoIcon"
+    LogoImage.AnchorPoint = Vector2.new(0, 0.5) -- Titik pusat di kiri tengah
+    LogoImage.Position = UDim2.new(0, 8, 0.5, 0) -- Padding 8px dari kiri
+    LogoImage.Size = UDim2.new(0, 36, 0, 36) -- Ukuran logo persegi
+    LogoImage.BackgroundTransparency = 1
+    LogoImage.Image = Settings.LogoContent
+    LogoImage.ScaleType = Enum.ScaleType.Fit
+    LogoImage.Parent = MainFrame
 
-    -- Logic Draggable & Toggle
+    -- [5] BAGIAN KANAN: CONTAINER TEKS (FPS & Ping)
+    local TextContainer = Instance.new("Frame")
+    TextContainer.Name = "TextContainer"
+    TextContainer.BackgroundTransparency = 1
+    -- Posisi mulai setelah logo (sekitar 50px dari kiri)
+    TextContainer.Position = UDim2.new(0, 50, 0, 0)
+    -- Lebar sisa dikurangi padding kanan sedikit
+    TextContainer.Size = UDim2.new(1, -55, 1, 0) 
+    TextContainer.Parent = MainFrame
+
+    local FpsLabel = Instance.new("TextLabel")
+    FpsLabel.Name = "FpsLabel"
+    FpsLabel.Size = UDim2.new(1, 0, 0.5, 0) -- Setengah atas container
+    FpsLabel.Position = UDim2.new(0, 0, 0.05, 0)
+    FpsLabel.BackgroundTransparency = 1
+    FpsLabel.Text = "FPS: --"
+    FpsLabel.TextColor3 = Color3.fromRGB(200, 255, 200) -- Hijau Muda
+    FpsLabel.Font = Enum.Font.GothamBold
+    FpsLabel.TextSize = 13
+    FpsLabel.TextXAlignment = Enum.TextXAlignment.Left -- Rata Kiri
+    FpsLabel.Parent = TextContainer
+
+    local PingLabel = Instance.new("TextLabel")
+    PingLabel.Name = "PingLabel"
+    PingLabel.Size = UDim2.new(1, 0, 0.5, 0) -- Setengah bawah container
+    PingLabel.Position = UDim2.new(0, 0, 0.5, 0)
+    PingLabel.BackgroundTransparency = 1
+    PingLabel.Text = "Ping: -- ms"
+    PingLabel.TextColor3 = Color3.fromRGB(255, 255, 255) -- Putih
+    PingLabel.Font = Enum.Font.GothamBold
+    PingLabel.TextSize = 13
+    PingLabel.TextXAlignment = Enum.TextXAlignment.Left -- Rata Kiri
+    PingLabel.Parent = TextContainer
+
+    -- [6] Logic Update Realtime
+    task.spawn(function()
+        local RunService = game:GetService("RunService")
+        local StatsService = game:GetService("Stats")
+        
+        while MainFrame.Parent do
+            local fps = math.floor(workspace:GetRealPhysicsFPS())
+            local ping = "0"
+            pcall(function()
+                ping = math.floor(StatsService.Network.ServerStatsItem["Data Ping"]:GetValue())
+            end)
+
+            FpsLabel.Text = "FPS: " .. fps
+            PingLabel.Text = "Ping: " .. ping .. " ms"
+            
+            if tonumber(ping) > 200 then
+                PingLabel.TextColor3 = Color3.fromRGB(255, 80, 80)
+            elseif tonumber(ping) > 100 then
+                PingLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
+            else
+                PingLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            end
+            task.wait(0.5)
+        end
+    end)
+
+    -- [7] Logic Draggable & Click Toggle
     local dragging, dragInput, dragStart, startPos
     local function update(input)
         local delta = input.Position - dragStart
@@ -1159,22 +1236,14 @@ local function CreateFloatingWidget(config)
     end
     MainFrame.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPos = MainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+            dragging = true; dragStart = input.Position; startPos = MainFrame.Position
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
         end
     end)
     MainFrame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
     end)
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if input == dragInput and dragging then update(input) end
-    end)
+    game:GetService("UserInputService").InputChanged:Connect(function(input) if input == dragInput and dragging then update(input) end end)
 
     local isDragging = false
     MainFrame.InputBegan:Connect(function() isDragging = false end)
@@ -1182,29 +1251,33 @@ local function CreateFloatingWidget(config)
     
     MainFrame.MouseButton1Click:Connect(function()
         if isDragging then return end
+        -- Animasi Klik Kecil
+        local ts = game:GetService("TweenService")
+        ts:Create(MainFrame, TweenInfo.new(0.1), {Size = UDim2.new(0, Settings.Size.X.Offset - 10, 0, Settings.Size.Y.Offset - 5)}):Play()
+        task.wait(0.1)
+        ts:Create(MainFrame, TweenInfo.new(0.1), {Size = Settings.Size}):Play()
+
         if Library and Library.Toggle then Library:Toggle() 
         elseif Library and Library.MainFrame then Library.MainFrame.Visible = not Library.MainFrame.Visible end
     end)
 end
 
 -- =================================================================
--- EKSEKUSI (DENGAN LOGO ANDA)
+-- EKSEKUSI WIDGET BARU
 -- =================================================================
 
--- 1. Siapkan Link & Nama File
-local myLogoUrl = "https://raw.githubusercontent.com/emowbaik/script-emow/refs/heads/master/asset/Logo_emow_transparent.png"
-local myLogoFile = "EmowWidgetLogo.png" -- Nama file saat disimpan di HP/PC
+-- 1. Siapkan Logo
+local logoUrl = "https://raw.githubusercontent.com/emowbaik/script-emow/refs/heads/master/asset/Logo_emow_transparent.png"
+local logoFile = "EmowWidgetLogo.png"
+local widgetLogoAsset = GetCustomIcon(logoUrl, logoFile)
 
--- 2. Download & Load
-local logoAsset = GetCustomIcon(myLogoUrl, myLogoFile)
-
--- 3. Buat Widget
+-- 2. Buat Widget
 CreateFloatingWidget({
-    Type = "Icon",
-    Content = logoAsset, -- Masukkan hasil load tadi
-    Size = UDim2.new(0, 55, 0, 55), -- Ukuran Tombol
-    Color = Color3.fromRGB(15, 15, 15), -- Background Hitam
-    StrokeColor = Color3.fromRGB(255, 255, 255) -- Pinggiran Putih
+    Size = UDim2.new(0, 160, 0, 50), -- Ukuran lebih lebar
+    Color = Color3.fromRGB(12, 12, 12), 
+    StrokeColor = Color3.fromRGB(0, 255, 128),
+    Position = UDim2.new(0.05, 0, 0.15, 0),
+    LogoContent = widgetLogoAsset -- Masukkan asset logo di sini
 })
 
 
@@ -1212,6 +1285,42 @@ CreateFloatingWidget({
 -- SETTINGS & UNLOAD
 ------------------------------------------------------------------
 local Keybind = Tabs["UISettings"]:AddLeftGroupbox("Keybind", "keyboard")
+
+-- [AUTO REFRESH STARTUP LOGIC]
+-- Menunggu hingga UI Shop benar-benar ada, lalu refresh data
+task.spawn(function()
+    -- Cek berulang kali sampai UI Game Loading
+    local retries = 0
+    local loaded = false
+    while retries < 20 do
+        if LocalPlayer.PlayerGui:FindFirstChild("Main") and LocalPlayer.PlayerGui.Main:FindFirstChild("Restock") and LocalPlayer.PlayerGui.Main:FindFirstChild("Potions") then
+            loaded = true
+            break
+        end
+        retries = retries + 1
+        task.wait(0.5)
+    end
+    
+    if loaded then
+        task.wait(1) -- Safety buffer
+        
+        -- Refresh Dice
+        local diceList = GetDynamicDiceList()
+        if Options.DiceSelector then Options.DiceSelector:SetValues(diceList) end
+        
+        -- Refresh Potion
+        local potionList = GetDynamicPotionList()
+        if Options.PotionSelector then Options.PotionSelector:SetValues(potionList) end
+        
+        -- Refresh Egg
+        local eggList = GetDynamicEggList()
+        if Options.EggSelector then Options.EggSelector:SetValues(eggList) end
+        
+        Library:Notify({Title="System", Description="Shop Data Synced 🔄", Time=1})
+    else
+        warn("UI Shop took too long to load.")
+    end
+end)
 
 Library:OnUnload(function()
     print("Unloaded!", 3)
