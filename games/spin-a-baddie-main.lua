@@ -261,20 +261,64 @@ PlayerBox:AddToggle('HideNotificationsToggle', {
     end
 })
 
+-- ANTI-AFK
 PlayerBox:AddToggle('AntiAfkToggle', {
-    Text = 'Anti-AFK Mode',
+    Text = 'Anti-AFK (Proactive)',
     Default = false,
     Callback = function(Value)
-        local player = game:GetService("Players").LocalPlayer
+        _G.AntiAfkActive = Value
+
         if Value then
-            if _G.AntiAfkConnection then pcall(function() _G.AntiAfkConnection:Disconnect() end) _G.AntiAfkConnection = nil end
-            _G.AntiAfkConnection = player.Idled:Connect(function()
-                VirtualUser:CaptureController()
-                VirtualUser:ClickButton2(Vector2.new())
-            end)
+            -- === ENABLE ===
             Library:Notify({Title ="System", Description="Anti-AFK Enabled", Time=1})
+            
+            -- LOOP PROAKTIF: Jalan setiap 60 detik, tidak peduli status Idle atau tidak
+            task.spawn(function()
+                while _G.AntiAfkActive do
+                    local virtualUser = game:GetService("VirtualUser")
+                    
+                    -- Metode 1: Klik Mouse Virtual
+                    pcall(function()
+                        virtualUser:CaptureController()
+                        virtualUser:ClickButton2(Vector2.new())
+                    end)
+                    
+                    -- Metode 2: Simulasi Input Keyboard (Cadangan jika mouse gagal)
+                    -- Ini tidak akan mengganggu gameplay karena sangat cepat
+                    pcall(function()
+                        local Unfocus = game:GetService("GuiService").MenuIsOpen
+                        -- Hanya tekan tombol jika menu roblox tidak sedang terbuka (biar gak kepencet leave)
+                        if not Unfocus then 
+                            game:GetService("VirtualUser"):Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                            task.wait(0.1)
+                            game:GetService("VirtualUser"):Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
+                        end
+                    end)
+                    
+                    -- print("[Anti-AFK] Refreshing Activity...")
+                    task.wait(60) -- Ulangi setiap 1 menit (Timer Roblox AFK itu 20 menit, jadi ini sangat aman)
+                end
+            end)
+            
+            -- BACKUP: Tetap pasang koneksi Idled standar sebagai pertahanan lapis kedua
+            if _G.AntiAfkConnection then pcall(function() _G.AntiAfkConnection:Disconnect() end) end
+            _G.AntiAfkConnection = game:GetService("Players").LocalPlayer.Idled:Connect(function()
+                game:GetService("VirtualUser"):CaptureController()
+                game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+                print("[Anti-AFK] Idled event detected & reset!")
+                -- Library:Notify({Title ="Anti-AFK", Description="Idled detected & Reset!", Time=2})
+            end)
+
         else
-            if _G.AntiAfkConnection then pcall(function() _G.AntiAfkConnection:Disconnect() end) _G.AntiAfkConnection = nil end
+            -- === DISABLE ===
+            _G.AntiAfkActive = false -- Mematikan Loop Proaktif
+            
+            -- Mematikan Listener Idled
+            if _G.AntiAfkConnection then 
+                pcall(function() _G.AntiAfkConnection:Disconnect() end) 
+                _G.AntiAfkConnection = nil 
+            end
+
             Library:Notify({Title ="System", Description="Anti-AFK Disabled", Time=1})
         end
     end
