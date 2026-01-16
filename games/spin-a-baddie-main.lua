@@ -381,7 +381,7 @@ AutoFarmCoins:AddSlider('AutoCollectDelaySlider', {
     Callback = function(Value) _G.AutoCollectDelay = Value end
 })
 
-Library:AddLabel(AutoFarmCoins.Container, "Use a little longer delay to be safe.", true)
+AutoFarmCoins:AddLabel("Use a little longer delay to be safe.", true)
 
 _G.AutoRollDiceLoop = false
 _G.AutoRollDiceDelay = 1
@@ -1138,7 +1138,7 @@ local function CreateFloatingWidget(config)
     MainFrame.Size = Settings.Size
     MainFrame.Position = Settings.Position
     MainFrame.BackgroundColor3 = Settings.Color
-    MainFrame.BackgroundTransparency = 0.2
+    MainFrame.BackgroundTransparency = 0
     MainFrame.Text = "" 
     MainFrame.AutoButtonColor = false
     MainFrame.Parent = ScreenGui
@@ -1275,7 +1275,7 @@ local widgetLogoAsset = GetCustomIcon(logoUrl, logoFile)
 CreateFloatingWidget({
     Size = UDim2.new(0, 160, 0, 50), -- Ukuran lebih lebar
     Color = Color3.fromRGB(12, 12, 12), 
-    StrokeColor = Color3.fromRGB(0, 255, 128),
+    StrokeColor = Color3.fromRGB(255, 255, 255),
     Position = UDim2.new(0.05, 0, 0.15, 0),
     LogoContent = widgetLogoAsset -- Masukkan asset logo di sini
 })
